@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Silo Breaker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Playfair+Display:wght@700;900&family=JetBrains+Mono:wght@500&display=swap');
+        
+        :root {
+            --paper-bg: #fdfaf3;
+            --news-ink: #1a1c20;
+            --corporate-blue: #1e3a8a;
+            --portal-green: #10b981;
+            --portal-red: #ef4444;
+            --dynamic-bg: #f8fafc;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: var(--dynamic-bg);
+            color: #1e293b;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            touch-action: none;
+        }
+
+        .font-news { font-family: 'Playfair Display', serif; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Newspaper Aesthetic */
+        .newspaper-container {
+            background-color: var(--paper-bg);
+            background-image: url("https://www.transparenttextures.com/patterns/paper-fibers.png");
+            color: var(--news-ink);
+            border: 1px solid #d1d1d1;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            width: 100%;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .news-header-border {
+            border-top: 4px solid var(--news-ink);
+            border-bottom: 2px solid var(--news-ink);
+            padding: 0.5rem 0;
+            margin-bottom: 1.25rem;
+        }
+
+        /* Card Mechanics */
+        .card-deck {
+            z-index: 10;
+            position: relative;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .decision-card {
+            cursor: grab;
+            transition: transform 0.1s ease, box-shadow 0.3s ease, opacity 0.3s ease;
+            user-select: none;
+            touch-action: none;
+            background: #ffffff;
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e2e8f0;
+            width: 85vw;
+            max-width: 340px;
+            height: 420px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            border-radius: 2.5rem;
+            position: relative;
+        }
+
+        /* Portal Visual Feedback - Enhanced Permanent Color */
+        .portal-indicator {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 80px;
+            height: 160px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            opacity: 0.5;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: none;
+            border: 2px solid transparent;
+        }
+        
+        .portal-left { 
+            left: 10px; 
+            border-radius: 0 100px 100px 0; 
+            color: var(--portal-red);
+        }
+        
+        .portal-right { 
+            right: 10px; 
+            border-radius: 100px 0 0 100px; 
+            color: var(--portal-green);
+        }
+
+        /* Active Menyala State */
+        .active-energy { 
+            opacity: 1; 
+            transform: translateY(-50%) scale(1.1); 
+            background: rgba(16, 185, 129, 0.1); 
+            border: 3px solid var(--portal-green);
+            box-shadow: 0 0 40px rgba(16, 185, 129, 0.5), inset 0 0 20px rgba(16, 185, 129, 0.3);
+        }
+        
+        .active-ego { 
+            opacity: 1; 
+            transform: translateY(-50%) scale(1.1); 
+            background: rgba(239, 68, 68, 0.1); 
+            border: 3px solid var(--portal-red);
+            box-shadow: 0 0 40px rgba(239, 68, 68, 0.5), inset 0 0 20px rgba(239, 68, 68, 0.3);
+        }
+
+        @keyframes popUp {
+            0% { opacity: 0; transform: translate(-50%, 20%) scale(0.5); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+            100% { opacity: 0; transform: translate(-50%, -120%) scale(1); }
+        }
+        .pop-score { animation: popUp 0.8s ease-out forwards; }
+
+        .terminal-glow { box-shadow: 0 0 50px rgba(37, 99, 235, 0.15); }
+
+        .hologram {
+            animation: flicker 4s infinite;
+        }
+        @keyframes flicker {
+            0%, 100% { opacity: 1; }
+            5% { opacity: 0.8; }
+            10% { opacity: 0.95; }
+            15% { opacity: 0.85; }
+            20% { opacity: 1; }
+        }
+
+        .swipe-hint {
+            animation: pulse-hint 2s infinite ease-in-out;
+        }
+        @keyframes pulse-hint {
+            0%, 100% { transform: scale(1); opacity: 0.6; }
+            50% { transform: scale(1.05); opacity: 1; }
+        }
+
+        #game-hint-bubble {
+            transform: translateY(-10px);
+            opacity: 0;
+            transition: all 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        #game-hint-bubble.visible {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-start p-4 md:p-8">
+
+    <!-- 1. DASHBOARD AWAL -->
+    <div id="report-screen" class="fixed inset-0 z-[120] bg-slate-100 flex items-center justify-center p-4">
+        <div class="newspaper-container p-6 md:p-12 flex flex-col relative rounded-sm">
+            <div class="text-center mb-6">
+                <h1 class="font-news text-4xl md:text-6xl font-black mb-1 tracking-tighter uppercase text-slate-900">Silo Breaker</h1>
+                <div class="news-header-border flex justify-between text-[10px] font-bold uppercase tracking-widest px-2">
+                    <span>Edisi: Krisis Budaya</span>
+                    <span id="current-date">SABTU, 11 APRIL 2026</span>
+                    <span>Vol. 07 / No. 14</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="md:col-span-2 text-left">
+                    <div class="bg-red-600 text-white px-3 py-1 inline-block text-[10px] font-black uppercase tracking-widest mb-2">Peringatan Direksi</div>
+                    <h2 class="font-news text-2xl md:text-4xl leading-tight font-bold text-slate-900 italic mb-4">
+                        Tembok Silo Mengancam <span class="border-b-2 border-red-600">Keberlanjutan</span> Tim Kita!
+                    </h2>
+                    <p class="text-sm md:text-base leading-relaxed text-slate-800">
+                        Audit kepemimpinan mengungkapkan bahwa 88% departemen bekerja secara terisolasi. Architect, intervensi Anda dibutuhkan untuk membangun kembali kepercayaan antar tim.
+                    </p>
+                </div>
+
+                <div class="bg-white/50 p-5 border border-slate-200 rounded-xl flex flex-col justify-center">
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between text-[10px] font-black mb-1 text-slate-400 uppercase tracking-widest">Trust Index</div>
+                            <div class="h-2 bg-slate-200 rounded-full overflow-hidden">
+                                <div class="h-full bg-blue-600 transition-all duration-1000" style="width: 12%"></div>
+                            </div>
+                        </div>
+                        <div id="status-box" class="p-3 bg-red-600 text-white text-center rounded-lg shadow-md">
+                            <span class="block text-lg font-black uppercase tracking-tighter">DARURAT</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button id="start-btn" onclick="showBriefing()" class="mt-10 w-full bg-black text-white font-bold py-5 text-lg hover:bg-slate-900 transition-all shadow-xl active:scale-95">
+                MULAI INTERVENSI
+            </button>
+        </div>
+    </div>
+
+    <!-- 2. LAYAR BRIEFING -->
+    <div id="briefing-screen" class="fixed inset-0 z-[130] bg-slate-900/95 backdrop-blur-xl hidden items-center justify-center p-4">
+        <div class="max-w-md w-full bg-white rounded-[3rem] p-8 md:p-10 shadow-2xl relative border border-blue-100 terminal-glow text-center">
+            
+            <div class="flex items-center justify-center gap-2 mb-4">
+                <span class="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
+                <span class="text-[9px] font-black text-blue-600 uppercase tracking-[0.3em] mono">Connection Active</span>
+            </div>
+
+            <h2 class="text-2xl font-black text-slate-900 mb-6 tracking-tighter uppercase">BRIEFING MISI</h2>
+            
+            <!-- Commander Visual -->
+            <div class="relative w-36 h-36 mx-auto mb-6 hologram">
+                <div class="absolute inset-0 bg-blue-400/20 rounded-full blur-2xl"></div>
+                <div class="relative w-full h-full rounded-full bg-slate-900 p-1 border-4 border-white flex items-center justify-center overflow-hidden shadow-2xl">
+                    <svg width="100%" height="100%" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="100" cy="100" r="100" fill="#0f172a"/>
+                        <path d="M40 195c5-35 25-65 60-65s55 30 60 65H40z" fill="#1e3a8a"/>
+                        <path d="M78 130l22 28 22-28v65H78z" fill="#fff"/>
+                        <circle cx="100" cy="80" r="45" fill="#d2b48c"/>
+                        <path d="M55 75c0-15 10-40 45-40s45 25 45 40c-5-5-15-10-45-10s-40 5-45 10z" fill="#2c1b18"/>
+                        <circle cx="86" cy="85" r="3.5" fill="#1a1c20"/>
+                        <circle cx="114" cy="85" r="3.5" fill="#1a1c20"/>
+                        <path d="M88 108 Q100 118 112 108" stroke="#1a1c20" stroke-width="3" fill="none" stroke-linecap="round"/>
+                    </svg>
+                </div>
+            </div>
+
+            <div class="text-left bg-slate-50 rounded-2xl p-6 border border-slate-100 mb-8">
+                <p id="briefing-msg" class="text-slate-600 leading-relaxed text-sm italic mb-6 min-h-[60px]"></p>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="p-3 bg-white border border-slate-100 rounded-xl shadow-sm text-center swipe-hint">
+                        <div class="text-emerald-500 mb-1">
+                            <svg class="w-6 h-6 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
+                        </div>
+                        <p class="text-[9px] font-black text-emerald-600 uppercase tracking-wider">SWIPE KANAN</p>
+                        <p class="text-[8px] text-slate-400 font-bold">SINERGI / INKLUSIF</p>
+                    </div>
+                    <div class="p-3 bg-white border border-slate-100 rounded-xl shadow-sm text-center swipe-hint">
+                        <div class="text-red-500 mb-1">
+                            <svg class="w-6 h-6 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7"/></svg>
+                        </div>
+                        <p class="text-[9px] font-black text-red-600 uppercase tracking-wider">SWIPE KIRI</p>
+                        <p class="text-[8px] text-slate-400 font-bold">EGO / TOXIC</p>
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="closeBriefingAndStart()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-full shadow-lg active:scale-95 uppercase tracking-widest text-xs">
+                AKTIFKAN SINERGI
+            </button>
+        </div>
+    </div>
+
+    <!-- 3. GAME HUD & HINT BUBBLE -->
+    <div id="hud-container" class="w-full max-w-4xl flex flex-col items-center gap-3 z-50 transition-all duration-700 opacity-0 pointer-events-none">
+        <div id="game-hud" class="w-full flex justify-between items-center bg-white/80 backdrop-blur-sm p-4 md:p-6 rounded-[2rem] border border-white/50">
+            <div class="flex flex-col w-1/2">
+                <div class="flex justify-between mb-1">
+                    <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Team Trust</span>
+                    <span id="progress-percent" class="text-[10px] font-black text-blue-600">12%</span>
+                </div>
+                <div class="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                    <div id="progress-bar" class="h-full bg-blue-600 w-[12%] transition-all duration-700"></div>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-4">
+                <div id="combo-badge" class="hidden bg-blue-600 text-white px-4 py-1 rounded-full text-[10px] font-black uppercase">Combo x2</div>
+                <div class="text-lg font-black text-slate-700 bg-white w-10 h-10 rounded-full flex items-center justify-center border border-slate-200 shadow-sm">
+                    <span id="count-text">10</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hint Bubble Commander -->
+        <div id="game-hint-bubble" class="flex items-center gap-3 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-2xl border border-white/60 shadow-sm max-w-xs md:max-w-md">
+            <div class="w-8 h-8 rounded-full bg-slate-900 border border-slate-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                <svg width="24" height="24" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="100" cy="100" r="100" fill="#0f172a"/>
+                    <path d="M40 195c5-35 25-65 60-65s55 30 60 65H40z" fill="#1e3a8a"/>
+                    <circle cx="100" cy="80" r="45" fill="#d2b48c"/>
+                    <path d="M55 75c0-15 10-40 45-40s45 25 45 40c-5-5-15-10-45-10s-40 5-45 10z" fill="#2c1b18"/>
+                </svg>
+            </div>
+            <div class="text-[9px] md:text-[10px] font-bold text-slate-600 leading-tight">
+                <span class="text-blue-600 font-black uppercase">Commander:</span> Geser <span class="text-red-500">Kiri</span> (Ego) atau <span class="text-emerald-500">Kanan</span> (Sinergi).
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. AREA BERMAIN -->
+    <div id="play-area" class="relative w-full max-w-4xl flex-1 flex items-center justify-center opacity-0 pointer-events-none transition-all duration-700 mt-4">
+        
+        <!-- Portal Indicators - Ego (Selalu Merah) -->
+        <div id="portal-ego" class="portal-indicator portal-left">
+            <svg class="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            <span class="font-black text-[10px] uppercase -rotate-90">EGO</span>
+        </div>
+
+        <div class="card-deck">
+            <div id="active-card" class="decision-card">
+                <div class="w-12 h-1 bg-slate-100 rounded-full mb-10"></div>
+                <p id="card-text" class="text-lg md:text-xl font-bold text-slate-800 leading-snug text-center italic px-4"></p>
+                
+                <div class="mt-auto flex flex-col items-center opacity-40 pointer-events-none">
+                    <span class="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2">Pilih Tindakan</span>
+                    <div class="flex gap-12 items-center text-[10px] font-black text-slate-400">
+                        <span>← EGO</span>
+                        <span>SINERGI →</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Portal Indicators - Sinergi (Selalu Hijau) -->
+        <div id="portal-energy" class="portal-indicator portal-right">
+            <svg class="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
+            <span class="font-black text-[10px] uppercase rotate-90">SINERGI</span>
+        </div>
+    </div>
+
+    <!-- 5. FEEDBACK MODAL -->
+    <div id="feedback-modal" class="fixed inset-0 z-[150] bg-slate-900/60 backdrop-blur-md hidden items-center justify-center p-6">
+        <div class="max-w-sm w-full bg-white rounded-[2.5rem] p-8 text-center shadow-2xl relative overflow-hidden">
+            <div id="modal-accent" class="absolute top-0 left-0 w-full h-2"></div>
+            <h4 id="feedback-title" class="text-xs font-black uppercase tracking-widest mb-4"></h4>
+            <p id="feedback-msg" class="text-sm text-slate-600 leading-relaxed italic mb-8"></p>
+            <button onclick="closeFeedbackAndContinue()" class="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl uppercase tracking-widest text-xs shadow-lg active:scale-95">
+                LANJUTKAN MISI
+            </button>
+        </div>
+    </div>
+
+    <!-- SCORE POPUP -->
+    <div id="score-popup" class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-[200] hidden">
+        <div id="score-popup-content" class="px-8 py-4 rounded-full font-black text-2xl shadow-2xl pop-score"></div>
+    </div>
+
+    <!-- RESULT SCREEN -->
+    <div id="result-screen" class="hidden fixed inset-0 z-[200] bg-slate-100 flex items-center justify-center p-4"></div>
+
+    <script>
+        // SFX System using Web Audio API
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(freq, type, duration, vol) {
+            try {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                oscillator.type = type;
+                oscillator.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(vol, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + duration);
+            } catch (e) { /* Audio fallback silent */ }
+        }
+
+        const SFX = {
+            click: () => playSound(600, 'sine', 0.1, 0.1),
+            success: () => {
+                playSound(800, 'sine', 0.2, 0.1);
+                setTimeout(() => playSound(1200, 'sine', 0.3, 0.08), 100);
+            },
+            fail: () => {
+                playSound(300, 'triangle', 0.3, 0.15);
+                setTimeout(() => playSound(200, 'triangle', 0.4, 0.1), 100);
+            },
+            end: () => playSound(440, 'sine', 0.8, 0.1)
+        };
+
+        const rawData = [
+            { text: "Saya butuh perspektif kalian karena saya tidak melihat apa yang terjadi di garis depan.", type: "energy", insight: "Inklusif: Menunjukkan kerendahan hati intelektual dan menghargai data lapangan." },
+            { text: "Terima kasih sudah berani kasih sudut pandang yang beda. Ini membantu kita melihat blind spot.", type: "energy", insight: "Inklusif: Membangun Psychological Safety dengan menghargai perbedaan opini." },
+            { text: "Bisa bantu saya paham lebih detail? Tantangan paling berat di lapangan seperti apa?", type: "energy", insight: "Inklusif: Menggunakan gaya kepemimpinan bertanya alih-alih memerintah." },
+            { text: "Apa yang saya lewatkan dari masalah ini? Saya ingin mendengar dari kalian semua.", type: "energy", insight: "Inklusif: Mengakui keterbatasan diri dan melibatkan tim secara aktif." },
+            { text: "Saya butuh satu alasan kenapa rencana saya ini akan gagal. Jangan takut bicara.", type: "energy", insight: "Inklusif: Sengaja mengundang kritik untuk mitigasi risiko bersama." },
+            { text: "SOP-nya sudah jelas. Harusnya kalian bisa lebih profesional. Pokoknya minggu depan beres!", type: "ego", insight: "Ego: Komunikasi satu arah (Command & Control) yang mematikan motivasi." },
+            { text: "Saya nggak mau dengar alasan klasik ya. Saya sudah bilang caranya dari awal.", type: "ego", insight: "Ego: Menolak realitas kendala teknis dan bersikap defensif terhadap ide sendiri." },
+            { text: "Kasih instruksi saja biar cepat, peduli setan soal masukan mereka yang ribet.", type: "ego", insight: "Ego: Merasa paling tahu segalanya (Omniscience) dan mengabaikan kolaborasi." },
+            { text: "Tim seolah-olah cuma nunggu perintah tanpa mau ambil risiko sendiri.", type: "ego", insight: "Ego: Menyalahkan bawahan atas kondisi kaku yang diciptakan pemimpin sendiri." },
+            { text: "Kalau saya bilang A ya A. Kita tidak punya waktu untuk debat yang tidak perlu.", type: "ego", insight: "Ego: Menutup ruang diskusi dengan alasan efisiensi semu." }
+        ];
+
+        let gameQueue = [];
+        let trustIndex = 12; 
+        let combo = 0;
+        let currentIndex = 0;
+
+        function typeWriter(text, elementId, speed = 15) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = "";
+            let i = 0;
+            function type() {
+                if (i < text.length) {
+                    element.innerHTML += text.charAt(i);
+                    i++;
+                    setTimeout(type, speed);
+                }
+            }
+            type();
+        }
+
+        function showBriefing() {
+            SFX.click();
+            document.getElementById('report-screen').classList.add('hidden');
+            document.getElementById('briefing-screen').classList.remove('hidden');
+            document.getElementById('briefing-screen').classList.add('flex');
+            
+            typeWriter("Architect, misi Anda adalah membangun Psychological Safety untuk meruntuhkan tembok silo. Geser kartu ke KANAN untuk Sinergi, atau ke KIRI untuk Ego. Target: 100% Trust Index!", "briefing-msg");
+        }
+
+        function closeBriefingAndStart() {
+            SFX.click();
+            document.getElementById('briefing-screen').classList.add('hidden');
+            startGame();
+        }
+
+        function startGame() {
+            document.getElementById('hud-container').classList.remove('opacity-0', 'pointer-events-none');
+            document.getElementById('play-area').classList.remove('opacity-0', 'pointer-events-none');
+            document.getElementById('game-hint-bubble').classList.add('visible');
+            gameQueue = [...rawData].sort(() => Math.random() - 0.5);
+            showNextCard();
+        }
+
+        function showNextCard() {
+            if (currentIndex >= gameQueue.length) {
+                endGame();
+                return;
+            }
+            const data = gameQueue[currentIndex];
+            const card = document.getElementById('active-card');
+            const cardText = document.getElementById('card-text');
+            
+            card.style.transition = 'none';
+            card.style.transform = 'scale(1) rotate(0) translate(0,0)';
+            card.style.opacity = '1';
+            cardText.innerText = `"${data.text}"`;
+            
+            initDrag(card);
+            updateHUD();
+        }
+
+        function updateHUD() {
+            document.getElementById('count-text').innerText = gameQueue.length - currentIndex;
+            trustIndex = Math.max(0, Math.min(100, trustIndex));
+            document.getElementById('progress-bar').style.width = trustIndex + '%';
+            document.getElementById('progress-percent').innerText = Math.round(trustIndex) + '%';
+
+            const comboBadge = document.getElementById('combo-badge');
+            if(combo > 1) {
+                comboBadge.classList.remove('hidden');
+                comboBadge.innerText = `Combo x${combo}`;
+            } else {
+                comboBadge.classList.add('hidden');
+            }
+        }
+
+        function initDrag(el) {
+            let startX, startY;
+            let isDragging = false;
+            
+            const onStart = (e) => {
+                isDragging = true;
+                const touch = e.touches ? e.touches[0] : e;
+                startX = touch.clientX;
+                startY = touch.clientY;
+                el.style.transition = 'none';
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+            };
+
+            const onMove = (e) => {
+                if (!isDragging) return;
+                const touch = e.touches ? e.touches[0] : e;
+                const dx = touch.clientX - startX;
+                const dy = touch.clientY - startY;
+                const rotation = dx * 0.1;
+                el.style.transform = `translate(${dx}px, ${dy}px) rotate(${rotation}deg) scale(1.05)`;
+
+                const pEnergy = document.getElementById('portal-energy');
+                const pEgo = document.getElementById('portal-ego');
+                
+                pEnergy.classList.remove('active-energy');
+                pEgo.classList.remove('active-ego');
+
+                if (dx > 40) pEnergy.classList.add('active-energy');
+                if (dx < -40) pEgo.classList.add('active-ego');
+            };
+
+            const onEnd = (e) => {
+                if (!isDragging) return;
+                isDragging = false;
+                const touch = e.changedTouches ? e.changedTouches[0] : e;
+                const dx = touch.clientX - startX;
+                
+                if (dx > 100) processChoice('energy');
+                else if (dx < -100) processChoice('ego');
+                else {
+                    el.style.transition = 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+                    el.style.transform = 'translate(0,0) rotate(0) scale(1)';
+                    document.getElementById('portal-energy').classList.remove('active-energy');
+                    document.getElementById('portal-ego').classList.remove('active-ego');
+                }
+            };
+
+            el.onmousedown = onStart; window.onmousemove = onMove; window.onmouseup = onEnd;
+            el.ontouchstart = onStart; window.ontouchmove = onMove; window.ontouchend = onEnd;
+        }
+
+        function processChoice(type) {
+            const data = gameQueue[currentIndex];
+            const isCorrect = data.type === type;
+            const card = document.getElementById('active-card');
+            const accent = document.getElementById('modal-accent');
+            
+            document.getElementById('portal-energy').classList.remove('active-energy');
+            document.getElementById('portal-ego').classList.remove('active-ego');
+
+            if (isCorrect) {
+                SFX.success();
+                combo++;
+                const bonus = combo > 1 ? combo * 2 : 0;
+                trustIndex += (10 + bonus);
+                showScorePopup(`TRUST +${10 + bonus}%`, "bg-emerald-500 text-white");
+                document.getElementById('feedback-title').innerText = "TINDAKAN TEPAT!";
+                document.getElementById('feedback-title').className = "text-xs font-black uppercase tracking-widest mb-4 text-emerald-600";
+                accent.className = "absolute top-0 left-0 w-full h-2 bg-emerald-500";
+            } else {
+                SFX.fail();
+                combo = 0;
+                trustIndex -= 15;
+                showScorePopup("TRUST -15%", "bg-red-500 text-white");
+                document.getElementById('feedback-title').innerText = "ANALISIS MELESET!";
+                document.getElementById('feedback-title').className = "text-xs font-black uppercase tracking-widest mb-4 text-red-600";
+                accent.className = "absolute top-0 left-0 w-full h-2 bg-red-500";
+            }
+
+            document.getElementById('feedback-msg').innerText = data.insight;
+            currentIndex++;
+            
+            card.style.transition = 'all 0.5s ease-in';
+            card.style.transform = `translate(${type === 'energy' ? 600 : -600}px, 0) rotate(${type === 'energy' ? 45 : -45}deg)`;
+            card.style.opacity = '0';
+            
+            setTimeout(() => {
+                document.getElementById('feedback-modal').style.display = 'flex';
+            }, 500);
+        }
+
+        function closeFeedbackAndContinue() {
+            SFX.click();
+            document.getElementById('feedback-modal').style.display = 'none';
+            showNextCard();
+        }
+
+        function showScorePopup(text, classes) {
+            const popup = document.getElementById('score-popup');
+            const content = document.getElementById('score-popup-content');
+            content.innerText = text;
+            content.className = `px-8 py-4 rounded-full font-black text-xl shadow-2xl pop-score ${classes}`;
+            popup.classList.remove('hidden');
+            setTimeout(() => popup.classList.add('hidden'), 800);
+        }
+
+        function endGame() {
+            SFX.end();
+            const isWin = trustIndex >= 70;
+            document.getElementById('hud-container').classList.add('opacity-0', 'pointer-events-none');
+            document.getElementById('play-area').classList.add('opacity-0', 'pointer-events-none');
+            
+            const resultScreen = document.getElementById('result-screen');
+            resultScreen.innerHTML = `
+                <div class="newspaper-container p-12 text-center rounded-sm max-w-lg">
+                    <h1 class="font-news text-4xl font-black mb-4 uppercase tracking-tighter">${isWin ? 'SINERGI TOTAL TERBENTUK!' : 'KRISIS BUDAYA BERLANJUT!'}</h1>
+                    <p class="mb-8 leading-relaxed text-sm md:text-base italic">${isWin 
+                        ? `Berkat intervensi strategis Anda, tim berhasil meruntuhkan silo. Trust Index melonjak ke <strong>${Math.round(trustIndex)}%</strong>. Masa depan kolaboratif telah dimulai.` 
+                        : `Upaya intervensi Anda belum cukup untuk menahan ego sektoral. Trust Index tertahan di <strong>${Math.round(trustIndex)}%</strong>. Krisis internal masih mengintai.`}</p>
+                    <button onclick="SFX.click(); setTimeout(() => location.reload(), 150)" class="w-full bg-black text-white font-bold py-5 uppercase tracking-widest text-sm hover:bg-slate-900 transition-all">INISIASI ULANG MISI</button>
+                </div>
+            `;
+            resultScreen.classList.remove('hidden');
+            resultScreen.classList.add('flex');
+        }
+
+        const dateEl = document.getElementById('current-date');
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        dateEl.innerText = new Date().toLocaleDateString('id-ID', options).toUpperCase();
+    </script>
+</body>
+</html>
